@@ -19,17 +19,17 @@ Estudio de caso aplicado, de enfoque cuantitativo y experimental. Se ejecutan pr
 
 ## Sistema bajo prueba y ambiente
 
-Las pruebas se ejecutan sobre una réplica de la aplicación y su base de datos, en el mismo cluster de Kubernetes que la instancia productiva, en un namespace independiente. Se eligió este ambiente porque no se dispone de un cluster no productivo y porque garantiza el mismo hardware, red y almacenamiento que la instancia real.
+Las pruebas se ejecutan sobre una réplica de la aplicación y su base de datos, en el mismo cluster de Kubernetes que la instancia productiva, en el mismo namespace (`kiwi`), con recursos identificados con el sufijo `-perf`, porque no se dispone de permisos para crear un namespace. Se eligió este ambiente porque no se dispone de un cluster no productivo y porque garantiza el mismo hardware, red y almacenamiento que la instancia real.
 
 Tabla 1. Características del sistema
 
 | Componente | Configuración de la réplica |
 | --- | --- |
-| Kiwi TCMS | Versión 13.5, mismo manifiesto que producción; requests de 8 CPU y 8Gi; límites de 8 CPU y 16Gi |
-| MariaDB | Versión 11.3.2, pod separado; requests de 1 CPU y 3Gi; límites de 6 CPU, 12Gi y 2Gi de almacenamiento efímero |
-| Parámetros de MariaDB | innodb_buffer_pool_size de 128 MiB, max_connections de 151, tmpdir en /opt/bitnami/mariadb/tmp; se mantienen sin modificar para reproducir fielmente el sistema en uso |
+| Kiwi TCMS | Versión 13.5, mismo manifiesto que producción; requests de 4 CPU y 8Gi; límites de 8 CPU y 16Gi |
+| MariaDB | Versión 11.3.2 (imagen mariadb:11.3), pod separado; requests de 1 CPU y 3Gi; límites de 6 CPU y 12Gi |
+| Parámetros de MariaDB | innodb_buffer_pool_size de 128 MiB, max_connections de 151, tmpdir en /tmp, juego de caracteres utf8mb3 (collation utf8mb3_general_ci) y max_allowed_packet de 16M; se mantienen sin modificar para reproducir fielmente el sistema en uso |
 | Ubicación | Mismo nodo que producción, con ambos pods juntos |
-| Datos | Copia de la base de datos de producción (4.3 GB, 71 tablas, 11,472 casos de prueba), restaurada con autorización del equipo |
+| Datos | Copia de la base de datos de producción (≈5.7 GB entre datos e índices, 71 tablas, 11,481 casos de prueba), restaurada con autorización del equipo |
 
 ## Herramientas
 
@@ -100,7 +100,7 @@ Tabla 6. Métricas seleccionadas
 | Tasa de error | k6, verificando el cuerpo de cada respuesta | Porcentaje de solicitudes fallidas |
 | CPU, memoria y almacenamiento efímero (Kiwi y MariaDB, por separado) | Prometheus y Grafana | Promedio, máximo y tendencia |
 | Reinicios, desalojos y throttling de CPU | Prometheus y eventos del cluster | Cantidad y motivo |
-| Tiempo de recuperación | k6 y Grafana | Segundos hasta que el tiempo de respuesta vuelve a la línea base |
+| Tiempo de recuperación | k6 (sondeo de 1 usuario virtual durante el enfriamiento) | Segundos hasta que el tiempo de respuesta vuelve a la línea base |
 
 ## Umbrales de decisión
 
@@ -134,9 +134,9 @@ El ranking de las tres áreas se obtiene de las puntuaciones.
 Como la réplica comparte el cluster y el nodo con la instancia productiva, las pruebas de estrés pueden afectar a otras cargas. Para reducir ese riesgo se aplican las siguientes medidas:
 
 1. Autorización previa del administrador del cluster y del equipo de QA, incluyendo la ventana horaria y el uso de una copia de los datos.
-2. Namespace dedicado con un ResourceQuota que limite la réplica a la suma de los límites definidos (14 CPU y 28Gi de memoria)
+2. Límites de recursos en cada pod de la réplica, cuya suma es 14 CPU y 28Gi de memoria (no se usa ResourceQuota porque se despliega en el namespace de producción y no se dispone de permiso para crearlo)
 3. Verificación de capacidad del nodo antes de desplegar, comprobando que haya recursos asignables para ambos conjuntos de pods. La carga del nodo es variable debido a las horas laborales; en caso de que el nodo no tenga suficientes recursos, se buscará otra ventana.
 4. Ejecución en horarios de bajo uso de la instancia productiva. Primera opción de ventana: martes 6:30 am UTC-6. Esta corresponde a dos horas antes del horario de entrada de los ingenieros de Costa Rica.
 5. Monitoreo de producción durante las pruebas (uso del nodo y salud de los pods productivos) con Prometheus y Grafana.
-6. Criterios de aborto: se detiene la prueba si el uso de memoria del nodo supera [85]%, si algún pod productivo se reinicia o es desalojado, o si el equipo reporta degradación en producción.
+6. Criterios de aborto: se detiene la prueba si el uso de memoria del nodo supera 30%, medido como memoria total usada del nodo (MemTotal menos MemAvailable), si algún pod productivo se reinicia o es desalojado, o si el equipo reporta degradación en producción.
 7. Orden de ejecución de menor a mayor intensidad (carga, resistencia y, al final, estrés).
