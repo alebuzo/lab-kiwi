@@ -1,0 +1,205 @@
+# Réplica de sts/kiwi (copiada de producción; cambian nombres, etiquetas, secret, PVC, DB host y nodo).
+# Las etiquetas NO deben coincidir con el selector de producción (instance=kiwi, name=kiwi).
+# Sin HTTPRoute/Ingress: solo Services ClusterIP.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kiwi-perf-media
+  namespace: kiwi
+  labels:
+    app.kubernetes.io/name: kiwi-perf
+    app.kubernetes.io/instance: kiwi-perf
+    app.kubernetes.io/part-of: kiwi-perf
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: hpe-standard
+  volumeMode: Filesystem
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kiwi-perf-http
+  namespace: kiwi
+  labels:
+    app.kubernetes.io/name: kiwi-perf
+    app.kubernetes.io/instance: kiwi-perf
+    app.kubernetes.io/part-of: kiwi-perf
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 8080
+    protocol: TCP
+    targetPort: http
+  selector:
+    app.kubernetes.io/name: kiwi-perf
+    app.kubernetes.io/instance: kiwi-perf
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kiwi-perf-https
+  namespace: kiwi
+  labels:
+    app.kubernetes.io/name: kiwi-perf
+    app.kubernetes.io/instance: kiwi-perf
+    app.kubernetes.io/part-of: kiwi-perf
+spec:
+  type: ClusterIP
+  ports:
+  - name: https
+    port: 8443
+    protocol: TCP
+    targetPort: https
+    appProtocol: https
+  selector:
+    app.kubernetes.io/name: kiwi-perf
+    app.kubernetes.io/instance: kiwi-perf
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: kiwi-perf
+  namespace: kiwi
+  labels:
+    app.kubernetes.io/name: kiwi-perf
+    app.kubernetes.io/instance: kiwi-perf
+    app.kubernetes.io/part-of: kiwi-perf
+spec:
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  podManagementPolicy: OrderedReady
+  replicas: 1
+  revisionHistoryLimit: 10
+  serviceName: kiwi-perf-http
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kiwi-perf
+      app.kubernetes.io/instance: kiwi-perf
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kiwi-perf
+        app.kubernetes.io/instance: kiwi-perf
+        app.kubernetes.io/part-of: kiwi-perf
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: asic-x86-02
+      imagePullSecrets:
+      - name: regcred
+      containers:
+      - name: kiwi
+        image: pvsdk-registry.rose.rdlabs.hpecorp.net/sdk_qa/kiwi:v13.5.5-sdk@sha256:162e4cb8fd3224e0772de88e83c2636cd18def14806669263c59abff3a103e7e
+        imagePullPolicy: Always
+        env:
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              key: secret_key
+              name: kiwi-perf-credentials
+        - name: KIWI_DB_USER
+          valueFrom:
+            secretKeyRef:
+              key: mariadb-username
+              name: kiwi-perf-credentials
+        - name: KIWI_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: mariadb-password
+              name: kiwi-perf-credentials
+        - name: KIWI_DB_HOST
+          value: kiwi-perf-mariadb
+        - name: KIWI_DB_PORT
+          value: "3306"
+        - name: KIWI_DB_NAME
+          value: kiwi
+        - name: SERVER_EMAIL
+          value: kiwi-no-reply@hpe.com
+        - name: EMAIL_SUBJECT_PREFIX
+          value: '[Kiwi-TCMS] '
+        - name: MEDIA_ROOT
+          value: /Kiwi/uploads
+        - name: MEDIA_URL
+          value: /uploads/
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        - containerPort: 8443
+          name: https
+          protocol: TCP
+        resources:
+          limits:
+            cpu: "8"
+            memory: 16Gi
+          requests:
+            cpu: "4"
+            memory: 8Gi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /Kiwi/uploads
+          name: media
+        - mountPath: /Kiwi/ssl/
+          name: internal-certs
+          readOnly: true
+      initContainers:
+      - name: migrations
+        image: pvsdk-registry.rose.rdlabs.hpecorp.net/sdk_qa/kiwi:v13.5.5-sdk@sha256:162e4cb8fd3224e0772de88e83c2636cd18def14806669263c59abff3a103e7e
+        imagePullPolicy: Always
+        command:
+        - /Kiwi/manage.py
+        - migrate
+        env:
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              key: secret_key
+              name: kiwi-perf-credentials
+        - name: KIWI_DB_USER
+          valueFrom:
+            secretKeyRef:
+              key: mariadb-username
+              name: kiwi-perf-credentials
+        - name: KIWI_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: mariadb-password
+              name: kiwi-perf-credentials
+        - name: KIWI_DB_HOST
+          value: kiwi-perf-mariadb
+        - name: KIWI_DB_PORT
+          value: "3306"
+        - name: KIWI_DB_NAME
+          value: kiwi
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext:
+        fsGroup: 1001
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: media
+        persistentVolumeClaim:
+          claimName: kiwi-perf-media
+      - name: internal-certs
+        secret:
+          defaultMode: 420
+          items:
+          - key: tls.crt
+            path: localhost.crt
+          - key: tls.key
+            path: localhost.key
+          secretName: kiwi-internal-certs
+  updateStrategy:
+    rollingUpdate:
+      partition: 0
+    type: RollingUpdate

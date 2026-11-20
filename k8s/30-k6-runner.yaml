@@ -1,0 +1,92 @@
+# Pod generador de carga. Se queda dormido; las pruebas se lanzan con `kubectl exec` (run-test.sh).
+# Scripts: k6/ se empaqueta en un tar.gz (preserva lib/ y scenarios/ para los imports relativos)
+# que scripts/deploy.sh guarda en el ConfigMap k6-scripts-perf (binaryData). Un initContainer lo
+# descomprime en un emptyDir montado en /scripts. Para cambiar scripts, deploy.sh recrea el pod.
+# Supuesto: PVC de resultados de 5Gi (el CSV de k6 de la prueba de 4 h puede ser grande; ajustar si hace falta).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: k6-results-perf
+  namespace: kiwi
+  labels:
+    app.kubernetes.io/name: k6-runner-perf
+    app.kubernetes.io/instance: kiwi-perf
+    app.kubernetes.io/part-of: kiwi-perf
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: hpe-standard
+  volumeMode: Filesystem
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: k6-runner-perf
+  namespace: kiwi
+  labels:
+    app.kubernetes.io/name: k6-runner-perf
+    app.kubernetes.io/instance: kiwi-perf
+    app.kubernetes.io/part-of: kiwi-perf
+spec:
+  restartPolicy: Always
+  nodeSelector:
+    kubernetes.io/hostname: asic-x86-01
+  securityContext:
+    fsGroup: 12345
+  initContainers:
+  - name: unpack-scripts
+    image: grafana/k6:2.4.0
+    command: ["sh", "-c", "tar xzf /scripts-src/scripts.tar.gz -C /scripts"]
+    volumeMounts:
+    - name: scripts-src
+      mountPath: /scripts-src
+      readOnly: true
+    - name: scripts
+      mountPath: /scripts
+  containers:
+  - name: k6
+    image: grafana/k6:2.4.0
+    command: ["sh", "-c", "while true; do sleep 3600; done"]
+    workingDir: /scripts
+    env:
+    - name: BASE_URL
+      value: https://kiwi-perf-https.kiwi.svc:8443
+    - name: MAKISE_USER
+      valueFrom:
+        secretKeyRef:
+          name: k6-perf-credentials
+          key: makise-username
+    - name: MAKISE_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: k6-perf-credentials
+          key: makise-password
+    - name: PERF_USER_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: k6-perf-credentials
+          key: perf-user-password
+    resources:
+      requests:
+        cpu: "2"
+        memory: 4Gi
+      limits:
+        cpu: "8"
+        memory: 16Gi
+    volumeMounts:
+    - name: results
+      mountPath: /results
+    - name: scripts
+      mountPath: /scripts
+  volumes:
+  - name: results
+    persistentVolumeClaim:
+      claimName: k6-results-perf
+  - name: scripts-src
+    configMap:
+      name: k6-scripts-perf
+  - name: scripts
+    emptyDir: {}

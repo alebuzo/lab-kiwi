@@ -1,3 +1,7 @@
 dumps/
 tcms.conf
 GRAFANA_TOKEN
+results/
+__pycache__/
+k6/test/out/
+.scratch/

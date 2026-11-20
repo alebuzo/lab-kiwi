@@ -1,0 +1,4 @@
+hallazgo,area,probabilidad,impacto,justificacion
+EXAMPLE: ejemplo de hallazgo de carga (borrar o reemplazar),carga,2,2,EXAMPLE: fila de ejemplo; el equipo QA califica los hallazgos reales
+EXAMPLE: ejemplo de hallazgo de estrés (borrar o reemplazar),estres,3,4,EXAMPLE: fila de ejemplo
+EXAMPLE: ejemplo de hallazgo de resistencia (borrar o reemplazar),resistencia,1,5,EXAMPLE: fila de ejemplo
