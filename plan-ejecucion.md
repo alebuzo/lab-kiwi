@@ -67,7 +67,7 @@ Tabla E2. Estado previo al inicio (una fila por día/prueba)
 - [ ] Terminal C: reservada para `scripts/run-test.sh`.
 
 ### 2.4 Restauración entre ejecuciones
-Antes de **cada** repetición (también la primera): restaurar la BD (mecanismo definido en la sección 5.5 del plan de infraestructura: clonado de PVC golden o restore del dump), verificar conteos. El método esperado es el clonado (≈33 s en el ensayo); el golden `mariadb-golden-perf` ya contiene los usuarios de prueba, no hace falta `seed-users.sh`. Pasos del clonado (solo recursos `-perf`):
+Antes de **cada** repetición (también la primera): restaurar la BD (mecanismo definido en la sección 5.5 del plan de infraestructura: clonado de PVC golden o restore del dump), verificar conteos. El método esperado es el clonado (≈33 s en el ensayo); el golden `mariadb-golden-perf` ya contiene los usuarios de prueba, no hace falta `seed-users.sh`. **Se ejecuta con `scripts/reset-db.sh`** (≈66–79 s en el ensayo, incluyendo apagar los pods; imprime la fila para E3 y verifica 71 tablas, 11,492 casos y 18 `perf_user_*`; no cuenta filas de `testruns_historicaltestexecution` porque con caché fría tarda >1 min y calentaría la caché de MariaDB). Pasos que realiza (solo recursos `-perf`):
 
 1. `kubectl scale sts/kiwi-perf sts/kiwi-perf-mariadb -n kiwi --replicas=0` y esperar a que los pods desaparezcan.
 2. `kubectl delete pvc mariadb-data-kiwi-perf-mariadb-0 -n kiwi`.
