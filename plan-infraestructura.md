@@ -341,7 +341,7 @@ El ensayo se hace fuera de la ventana de pruebas (idealmente en horario de bajo 
 
 ---
 
-### 11.1 Dimensionamiento de k6 y del CSV (medido en el smoke, 2026-11-20)
+### Anexo A. Dimensionamiento de k6 y del CSV (medido en el smoke, 2026-11-20)
 
 - Smoke (1 VU, 107 requests): CSV de 271,710 B ≈ **2.5 KB por request** (≈12 líneas por request). Pico del pod `k6-runner-perf`: 0.058 cores y ≈205 MiB de memoria de trabajo.
 - Estimación para resistencia (6 VUs, 4 h): usuarios ≈0.44 req/s por VU (4 pausas de 1–3 s por iteración) más la sonda cada 10 s ≈ 40 mil requests; A1 cada 10 min ≈ 24 corridas × ≈1,500 llamadas ≈ 36 mil. Total ≈ 77 mil requests ≈ **190 MB de CSV**, unas 4 % de los 5Gi del PVC `k6-results-perf` (hoy usa 68 MB con los smokes). El tamaño de 5Gi alcanza.
