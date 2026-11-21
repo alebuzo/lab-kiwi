@@ -19,8 +19,8 @@ SEL="namespace=\"kiwi\",pod=~\"$PODS\",container!=\"\",container!=\"POD\""
 NODES="node_uname_info{nodename=~\"$NODE_REGEX\"}"
 
 declare -A Q
-Q[cpu]="sum by (pod,container) (rate(container_cpu_usage_seconds_total{$SEL}[1m]))"
-Q[mem_working_set]="sum by (pod,container) (container_memory_working_set_bytes{$SEL})"
+Q[cpu]="max by (pod,container) (rate(container_cpu_usage_seconds_total{$SEL}[1m]))"
+Q[mem_working_set]="max by (pod,container) (container_memory_working_set_bytes{$SEL})"
 Q[cpu_throttling]="sum by (pod,container) (rate(container_cpu_cfs_throttled_periods_total{$SEL}[1m])) / sum by (pod,container) (rate(container_cpu_cfs_periods_total{$SEL}[1m]))"
 Q[restarts]="sum by (pod,container) (kube_pod_container_status_restarts_total{$SEL})"
 Q[log_fs_used]="sum by (pod,container) (kubelet_container_log_filesystem_used_bytes{namespace=\"kiwi\",pod=~\"$PODS\"})"

@@ -69,7 +69,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"$namespace\",pod=~\"$pod\",container!=\"\",container!=\"POD\"}[1m]))",
+          "expr": "sum by (pod) (max by (pod,container) (rate(container_cpu_usage_seconds_total{namespace=\"$namespace\",pod=~\"$pod\",container!=\"\",container!=\"POD\"}[1m])))",
           "legendFormat": "{{pod}}",
           "range": true,
           "refId": "A"
@@ -140,7 +140,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"$namespace\",pod=~\"$pod\",container!=\"\"})",
+          "expr": "sum by (pod) (max by (pod,container) (container_memory_working_set_bytes{namespace=\"$namespace\",pod=~\"$pod\",container!=\"\"}))",
           "legendFormat": "{{pod}}",
           "range": true,
           "refId": "A"
@@ -210,7 +210,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"$namespace\",pod=~\"$pod\",container!=\"\",container!=\"POD\"}[1m]))",
+          "expr": "sum by (pod) (max by (pod,container) (rate(container_cpu_usage_seconds_total{namespace=\"$namespace\",pod=~\"$pod\",container!=\"\",container!=\"POD\"}[1m])))",
           "legendFormat": "uso {{pod}}",
           "range": true,
           "refId": "A"
@@ -292,7 +292,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"$namespace\",pod=~\"$pod\",container!=\"\"})",
+          "expr": "sum by (pod) (max by (pod,container) (container_memory_working_set_bytes{namespace=\"$namespace\",pod=~\"$pod\",container!=\"\"}))",
           "legendFormat": "uso {{pod}}",
           "range": true,
           "refId": "A"
