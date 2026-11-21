@@ -329,7 +329,7 @@ Prometheus no expone el uso de almacenamiento efímero de los contenedores (`con
 4. Comprobar que los dashboards muestran los pods de la réplica y el nodo.
 5. Probar la recolección de MariaDB durante 5 min.
 6. Probar el procedimiento de restauración entre ejecuciones y registrar el tiempo: clonado de PVC y, si falla, restore del dump. **Hecho (2026-11-20): clonado de PVC, 33 s; ver 5.5.**
-7. Confirmar que el consumo del nodo y de producción no cambió significativamente durante el ensayo.
+7. Confirmar que el consumo del nodo y de producción no cambió significativamente durante el ensayo. **Hecho (2026-11-20, smoke):** pico de memoria del nodo 14.8 % (`asic-x86-01`) y 9.8 % (`asic-x86-02`), muy por debajo del 30 % de aborto; `kiwi-0` y `kiwi-mariadb-0` sin reinicios. Se acepta como referencia.
 
 El ensayo se hace fuera de la ventana de pruebas (idealmente en horario de bajo uso) y con la misma autorización.
 
