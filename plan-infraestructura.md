@@ -341,6 +341,12 @@ El ensayo se hace fuera de la ventana de pruebas (idealmente en horario de bajo 
 
 ---
 
+### 11.1 Dimensionamiento de k6 y del CSV (medido en el smoke, 2026-11-20)
+
+- Smoke (1 VU, 107 requests): CSV de 271,710 B ≈ **2.5 KB por request** (≈12 líneas por request). Pico del pod `k6-runner-perf`: 0.058 cores y ≈205 MiB de memoria de trabajo.
+- Estimación para resistencia (6 VUs, 4 h): usuarios ≈0.44 req/s por VU (4 pausas de 1–3 s por iteración) más la sonda cada 10 s ≈ 40 mil requests; A1 cada 10 min ≈ 24 corridas × ≈1,500 llamadas ≈ 36 mil. Total ≈ 77 mil requests ≈ **190 MB de CSV**, unas 4 % de los 5Gi del PVC `k6-results-perf` (hoy usa 68 MB con los smokes). El tamaño de 5Gi alcanza.
+- CPU y memoria: con 18 VUs la carga de k6 sigue siendo muy inferior a los requests del pod (2 CPU / 4Gi; límites 8 CPU / 16Gi). Es una extrapolación; **se confirma en la primera corrida de 18 VUs**, para lo cual `collect-prometheus.sh` ahora también recolecta CPU y memoria del pod `k6-runner-perf` (`prom_cpu.csv`, `prom_mem_working_set.csv`). Si el pico de CPU de k6 se acerca a 2 cores, el generador podría limitar la carga y hay que subir los requests.
+
 ## 12. Estado de preparación
 
 Decisiones P1–P19 resueltas; prechequeos V1–V7 verificados (sección 4). Veredicto: **listo para empezar la implementación**, con estas condiciones que no bloquean el inicio pero requieren confirmación manual:
@@ -353,4 +359,4 @@ Decisiones P1–P19 resueltas; prechequeos V1–V7 verificados (sección 4). Ver
 | 6 | Decidir si el dump `golden-20261118` es el definitivo o se genera uno más reciente | Confirmado | — |
 | 7 | Reportar al equipo que el CronJob `kiwi-database-backup` contiene una contraseña en texto plano | Usuario | Cuando convenga |
 
-Se validan en el ensayo (sección 10): arranque de MariaDB sobre un clon del PVC con datos (**ya validado**, 33 s), login JSON-RPC con el host del Service (CSRF/Referer), dimensionamiento del pod de k6, disponibilidad de `du`/`df` en las imágenes, `tmux`/`screen` en la máquina de ejecución (disponibles en la del agente) y el impacto en nodo y cluster.
+Se validan en el ensayo (sección 10): arranque de MariaDB sobre un clon del PVC con datos (**ya validado**, 33 s), login JSON-RPC con el host del Service (CSRF/Referer), dimensionamiento del pod de k6 (**estimado el 2026-11-20 con datos del smoke; ver abajo**; falta confirmar con la primera corrida de 18 VUs), disponibilidad de `du`/`df` en las imágenes, `tmux`/`screen` en la máquina de ejecución (disponibles en la del agente) y el impacto en nodo y cluster.

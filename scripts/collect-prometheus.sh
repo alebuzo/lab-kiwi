@@ -14,7 +14,7 @@ MAX_POINTS=10000
 CHUNK=$(( MAX_POINTS * STEP ))
 
 DIR="$(result_dir "$TEST" "$REP")"
-PODS='kiwi-perf-0|kiwi-perf-mariadb-0|kiwi-0|kiwi-mariadb-0'
+PODS='kiwi-perf-0|kiwi-perf-mariadb-0|kiwi-0|kiwi-mariadb-0|k6-runner-perf'
 SEL="namespace=\"kiwi\",pod=~\"$PODS\",container!=\"\",container!=\"POD\""
 NODES="node_uname_info{nodename=~\"$NODE_REGEX\"}"
 
