@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Uso: abort-watch.sh   (INTERVAL=30, MAX_ITER=0 = infinito, MEM_THRESHOLD=30)
-# Solo lectura. Sale con código 2 si un pod de producción se reinicia.
+# Por defecto solo lectura: sale con código 2 si un pod de producción se reinicia.
+# Aborto automático (desatendido): AUTO_ABORT_TEST=<prueba> AUTO_ABORT_REP=<N>. Ante A-1 (memoria de un nodo >= MEM_THRESHOLD)
+# o A-2 (pod productivo reiniciado/desalojado/OOM) detiene k6 en k6-runner-perf, escribe results/<prueba>/rep<N>/ABORTED.txt y sale con 2.
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
@@ -53,18 +55,27 @@ log "Baseline de reinicios: $(for p in "${PROD_PODS[@]}"; do printf '%s=%s ' "$p
 
 is_prod() { local p; for p in "${PROD_PODS[@]}"; do [[ "$p" == "$1" ]] && return 0; done; return 1; }
 
+auto_abort() {
+  [[ -n "${AUTO_ABORT_TEST:-}" && -n "${AUTO_ABORT_REP:-}" ]] || return 0
+  local rdir="/results/$AUTO_ABORT_TEST/rep$AUTO_ABORT_REP" d
+  d="$(result_dir "$AUTO_ABORT_TEST" "$AUTO_ABORT_REP")"
+  kexec "$K6_POD" sh -c "[ -f $rdir/k6.pid ] && kill \$(cat $rdir/k6.pid) 2>/dev/null; pkill -x k6 2>/dev/null; true" >/dev/null 2>&1 || true
+  { echo "abort_utc=$(ts_utc)"; echo "abort_local=$(ts_local)"; echo "motivo=$1"; echo "linea=$line"; } >"$d/ABORTED.txt"
+}
+
 i=0
 while :; do
   i=$((i + 1))
   line="$(ts_utc) (local $(ts_local))"
-  alert=0; abort=0
+  alert=0; abort=0; reason=""
   if state="$(pods_state 2>/dev/null)"; then
     while IFS=$'\t' read -r n phase r fl; do
       s="$n:$phase/r=$r"
       [[ "$fl" == "-" ]] || s+="/$fl"
       bad=0
       if is_prod "$n"; then
-        [[ "$r" == "${base[$n]:-$r}" ]] || { bad=1; abort=1; }
+        [[ "$r" == "${base[$n]:-$r}" ]] || { bad=1; abort=1; reason="A-2: $n cambió su restartCount"; }
+        [[ "$fl" == "-" ]] || { bad=1; abort=1; reason="A-2: $n marcado $fl"; }
       fi
       [[ "$phase" == Running || "$n" == "$K6_POD" ]] || bad=1
       [[ "$fl" == "-" ]] || bad=1
@@ -77,7 +88,7 @@ while :; do
   if mem="$(mem_state 2>/dev/null)"; then
     while IFS=$'\t' read -r node pct; do
       s="$node mem=${pct}%"
-      if awk -v v="$pct" -v t="$MEM_THRESHOLD" 'BEGIN{exit !(v>=t)}'; then s="${RED}${s} >= ${MEM_THRESHOLD}% <!!>${RST}"; alert=1; fi
+      if awk -v v="$pct" -v t="$MEM_THRESHOLD" 'BEGIN{exit !(v>=t)}'; then s="${RED}${s} >= ${MEM_THRESHOLD}% <!!>${RST}"; alert=1; abort=1; reason="A-1: $node mem=${pct}% >= ${MEM_THRESHOLD}%"; fi
       line+=" | $s"
     done <<<"$mem"
   else
@@ -86,9 +97,10 @@ while :; do
   echo "$line"
   if (( abort )); then
     echo "${RED}############################################################" >&2
-    echo "# ABORTAR: un pod de PRODUCCIÓN cambió su restartCount (A-2)   #" >&2
+    echo "# ABORTAR: $reason" >&2
     echo "# Detener run-test.sh (Ctrl-C) y avisar al usuario             #" >&2
     echo "############################################################${RST}" >&2
+    auto_abort "$reason"
     exit 2
   fi
   (( MAX_ITER > 0 && i >= MAX_ITER )) && break
