@@ -2,7 +2,7 @@
 
 Este plan describe **qué hay que construir e instalar** antes de ejecutar las pruebas. La ejecución está en `plan-ejecucion.md`. Referencia de objetivos y metodología: `objetivos-metodologia.md`.
 
-> Estado: **solo plan**. Nada de esto se ha implementado. Los puntos marcados **PENDIENTE** no tienen valor definido y no deben asumirse. Veredicto de preparación en la sección 12.
+> Estado: **implementado y desplegado en el clúster (réplica `-perf`); smoke y ensayo de reseteo ejecutados el 2026-11-20** (ver 5.5 y 10). Los puntos marcados **PENDIENTE** no tienen valor definido y no deben asumirse. Veredicto de preparación en la sección 12.
 
 ---
 
@@ -169,6 +169,7 @@ Decisión del equipo: la réplica (`kiwi-perf-0` y `kiwi-perf-mariadb-0`) va en 
    3. Registrar el tiempo de cada paso.
 3. Verificar: 71 tablas, 11,492 casos de prueba (`SELECT COUNT(*) FROM testcases_testcase`; el conteo exacto es el del dump usado), 18,541,264 filas en `testruns_historicaltestexecution` y tamaño ≈ 5.7 GB.
 4. **Reinicio de la BD entre ejecuciones:** A1 escribe ejecuciones, por lo que la BD debe quedar idéntica antes de cada repetición. Decisión del equipo: en el ensayo previo se prueba primero **clonar un PVC "golden"** (PVC nuevo con `dataSource` apuntando al PVC golden, o el mecanismo equivalente que soporte `hpe-standard`) y se mide el tiempo. Mi cuenta no puede crear `VolumeSnapshot` ni leer la StorageClass `hpe-standard`, por lo que el clonado por PVC se verifica solo intentándolo; si el clonado falla o no es posible, se usa el restore del dump (punto 2) en cada repetición. Los 5 min entre repeticiones son un **mínimo**: las repeticiones se hacen tan rápido como permita el reset, y el tiempo real de reset se registra en la Tabla E3.
+   - **Resultado del ensayo (2026-11-20):** el clonado funciona. Restore limpio con `restore-db.sh --reset`: 4,149 s (≈69 min); luego `seed-users.sh`; luego `pvc/mariadb-golden-perf` (32Gi, Bound en 2 s) clonado del PVC de trabajo recién restaurado y sin uso por pruebas. Ciclo de reseteo completo (borrar PVC de trabajo 1 s, clonar desde el golden, MariaDB Ready a los 25 s, Kiwi Ready a los 33 s): **33 s**. El clon contiene 71 tablas, 11,492 casos, 18,541,264 filas en `testruns_historicaltestexecution`, los 18 `perf_user_*` y ningún tag `perf-u4`. El golden incluye los usuarios de prueba, por lo que no hay que ejecutar `seed-users.sh` tras cada reseteo. Restore del dump (≈69 min) queda como alternativa.
    - Con clonado: se mantiene `pvc/mariadb-golden-perf` (BD restaurada y verificada, sin uso); antes de cada repetición se escala `kiwi-perf` y `kiwi-perf-mariadb` a 0, se elimina el PVC de trabajo, se crea uno nuevo clonado del golden y se vuelve a escalar. Hay que evitar que ambos pods monten el mismo volumen (RWO).
    - Con restore del dump: se recrea la base (`DROP DATABASE kiwi; CREATE DATABASE kiwi` con las mismas collation, utf8mb3) y se vuelve a cargar; se reinician los pods de la réplica para partir de caché fría de manera consistente en todas las repeticiones.
 5. Usuarios de prueba (`scripts/seed-users.sh`), decididos por el equipo: 18 usuarios normales `perf_user_01..18` (uno por VU; en carga y resistencia se usan los 6 primeros) con permisos de lectura y escritura sobre TestCases, Test Executions, Test Plans y Bugs (mediante un grupo `perf_users` con esos permisos), más el usuario de automatización **`makise`** (superuser, como en producción; el username en la BD es minúscula), compartido por todas las corridas de A1. Se crean con `manage.py shell`/`createsuperuser` en el pod de la réplica y se recrean tras cada reinicio de la BD si el dump/clon no los incluye. Si `makise` ya existe en el dump, solo se le restablece la contraseña en la réplica (`manage.py changepassword makise`); nunca se usan credenciales de producción. Las contraseñas se guardan en `kiwi-perf-credentials`/secret de k6, no en el repo. El detalle exacto de permisos de un usuario QA típico se confirma en el ensayo comparando con la cuenta real (Admin > Users/Groups).
@@ -327,7 +328,7 @@ Prometheus no expone el uso de almacenamiento efímero de los contenedores (`con
 3. Medir: duración de U1 con 1 VU, tiempo de restore, que A1 con 1,500 llamadas dure ≈3 min y que el CSV generado sea procesable por `parse_k6.py`.
 4. Comprobar que los dashboards muestran los pods de la réplica y el nodo.
 5. Probar la recolección de MariaDB durante 5 min.
-6. Probar el procedimiento de restauración entre ejecuciones y registrar el tiempo: clonado de PVC y, si falla, restore del dump.
+6. Probar el procedimiento de restauración entre ejecuciones y registrar el tiempo: clonado de PVC y, si falla, restore del dump. **Hecho (2026-11-20): clonado de PVC, 33 s; ver 5.5.**
 7. Confirmar que el consumo del nodo y de producción no cambió significativamente durante el ensayo.
 
 El ensayo se hace fuera de la ventana de pruebas (idealmente en horario de bajo uso) y con la misma autorización.
@@ -352,4 +353,4 @@ Decisiones P1–P19 resueltas; prechequeos V1–V7 verificados (sección 4). Ver
 | 6 | Decidir si el dump `golden-20261118` es el definitivo o se genera uno más reciente | Confirmado | — |
 | 7 | Reportar al equipo que el CronJob `kiwi-database-backup` contiene una contraseña en texto plano | Usuario | Cuando convenga |
 
-Se validan en el ensayo (sección 10): arranque de MariaDB sobre un clon del PVC con datos (el clonado de PVC vacío de 1Gi y de 32Gi ya funcionó), login JSON-RPC con el host del Service (CSRF/Referer), dimensionamiento del pod de k6, disponibilidad de `du`/`df` en las imágenes, `tmux`/`screen` en la máquina de ejecución (disponibles en la del agente) y el impacto en nodo y cluster.
+Se validan en el ensayo (sección 10): arranque de MariaDB sobre un clon del PVC con datos (**ya validado**, 33 s), login JSON-RPC con el host del Service (CSRF/Referer), dimensionamiento del pod de k6, disponibilidad de `du`/`df` en las imágenes, `tmux`/`screen` en la máquina de ejecución (disponibles en la del agente) y el impacto en nodo y cluster.

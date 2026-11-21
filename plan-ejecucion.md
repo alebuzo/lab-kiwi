@@ -2,7 +2,7 @@
 
 Guía para quien ejecute las pruebas (persona o agente). Requiere que **todo** `plan-infraestructura.md` esté implementado y el ensayo previo (sección 10 de ese plan) esté aprobado. Referencias: `objetivos-metodologia.md`, `plan-infraestructura.md`.
 
-> Estado: **solo plan**. Los nombres de scripts y dashboards son los definidos en el plan de infraestructura. Los valores pendientes de confirmar están listados en la sección 12 del plan de infraestructura. No se inventan datos: toda celda vacía se llena con lo observado.
+> Estado: **réplica desplegada; smoke y ensayo de reseteo hechos (2026-11-20)**. Los nombres de scripts y dashboards son los definidos en el plan de infraestructura. Los valores pendientes de confirmar están listados en la sección 12 del plan de infraestructura. No se inventan datos: toda celda vacía se llena con lo observado.
 
 ---
 
@@ -67,7 +67,13 @@ Tabla E2. Estado previo al inicio (una fila por día/prueba)
 - [ ] Terminal C: reservada para `scripts/run-test.sh`.
 
 ### 2.4 Restauración entre ejecuciones
-Antes de **cada** repetición (también la primera): restaurar la BD (mecanismo definido en la sección 5.5 del plan de infraestructura: clonado de PVC golden o restore del dump), recrear usuarios si hace falta y verificar conteos.
+Antes de **cada** repetición (también la primera): restaurar la BD (mecanismo definido en la sección 5.5 del plan de infraestructura: clonado de PVC golden o restore del dump), verificar conteos. El método esperado es el clonado (≈33 s en el ensayo); el golden `mariadb-golden-perf` ya contiene los usuarios de prueba, no hace falta `seed-users.sh`. Pasos del clonado (solo recursos `-perf`):
+
+1. `kubectl scale sts/kiwi-perf sts/kiwi-perf-mariadb -n kiwi --replicas=0` y esperar a que los pods desaparezcan.
+2. `kubectl delete pvc mariadb-data-kiwi-perf-mariadb-0 -n kiwi`.
+3. Crear de nuevo `mariadb-data-kiwi-perf-mariadb-0` (32Gi, `hpe-standard`, mismas etiquetas `kiwi-perf`) con `dataSource` = PVC `mariadb-golden-perf`.
+4. `kubectl scale sts/kiwi-perf-mariadb -n kiwi --replicas=1`, esperar Ready; luego `kubectl scale sts/kiwi-perf -n kiwi --replicas=1`, esperar Ready.
+5. Verificar 71 tablas, 11,492 casos y 18,541,264 filas en `testruns_historicaltestexecution`; anotar la duración en E3.
 
 Tabla E3. Restauraciones
 
