@@ -20,7 +20,7 @@ python analysis/risk_matrix.py [--input analysis/risk_input.csv] [--output matri
 | `k6.csv` | CSV estándar de k6; las etiquetas propias se leen de `extra_tags` (urlencoded). Solo se cargan `http_req_duration`, `dur_*`, `rpc_ok`, `a1_*`. |
 | `times.txt` | Opcional. Se buscan líneas con `warmup`/`measure`/`cooldown` y una o dos marcas de tiempo (ISO UTC o epoch); `…start`/`…end` o dos marcas en la misma línea. Sin él, las fases salen de la etiqueta `phase`. |
 | `mariadb_status_<ts>.txt` | `SHOW GLOBAL STATUS` crudo (tab). El tiempo se toma del nombre (`YYYYMMDDTHHMMSSZ` o similar) o, si falta, del mtime. |
-| `ephemeral.csv` | `timestamp_utc,pod,tmp_kb,rootfs_used_kb`. |
+| `ephemeral.csv` | `timestamp_utc,pod,tmp_kb,rootfs_du_kb` (`du -sxk /`, sin volúmenes montados). |
 | `prom_*.csv` | La métrica se detecta por subcadena del nombre (`node_mem_pct`, `node_cpu_pct`, `log_fs`, `throttl`, `restart`, `cpu`, `mem`). Columnas: la de tiempo (`timestamp`/`time`/primera; epoch s/ms o ISO), la última o `value` como valor, y `pod`/`node`/`instance` (o `metric`/`labels` con `pod="..."`); si faltan, se infieren del nombre del archivo. Valores de throttling ≤ 1 se interpretan como fracción (× 100). |
 | `*event*.json` | Opcional (`kubectl get events -o json`) para la tabla E7; además E7 usa los incrementos de reinicios de Prometheus. |
 
@@ -33,7 +33,7 @@ python analysis/risk_matrix.py [--input analysis/risk_input.csv] [--output matri
 - A1: iniciadas = `run_id` distintos; con error = `a1_run_duration` con `status=error`, `calls_failed>0` o algún `rpc_ok=0` del `run_id` (se indica tipo y llamada); completas = terminadas sin error; solapadas = corridas cuyo intervalo (fin − duración) se traslapa con otra.
 - **Tiempo de recuperación**: segundos desde el inicio del cooldown hasta que la mediana móvil de 60 s (mín. 3 sondeos; sondeo con `rpc_ok=0` = ∞) de U3 del escenario `recovery_probe` es ≤ la mediana de U3 de la línea base (carga, combinado; `--baseline-u3-ms` la sustituye). Se anota si había una corrida A1 activa en el cooldown.
 - MariaDB: deltas por intervalo; un delta negativo (reinicio de contadores) se marca y se excluye de los totales. Ratio buffer pool = reads/requests (se añade hit ratio).
-- Recursos: reposo = promedio de los primeros 60 s de la serie exportada; prom./máx. dentro de la medición; almacenamiento efímero = máx. de `rootfs_used_kb` en toda la repetición; tendencia = último vs primer cuarto (±10 %).
+- Recursos: reposo = promedio de los primeros 60 s de la serie exportada; prom./máx. dentro de la medición; almacenamiento efímero = máx. de `rootfs_du_kb` en toda la repetición; tendencia = último vs primer cuarto (±10 %).
 - Resistencia: mediana por hora completa; primera hora vs últimos 60 min (umbral 25 %); memoria tras el cooldown = promedio de los últimos 60 s de la serie vs reposo (umbral +25 %).
 - Estrés: aumento relativo de medianas (umbral 50 %); tasa de error en puntos porcentuales absolutos (P18), comparada literalmente contra 50 pp.
 - Matriz de riesgo: `risk_input.csv` (`hallazgo,area,probabilidad,impacto,justificacion`; área `carga|estres|resistencia`, 1–5). Las filas cuyo hallazgo empieza con `EXAMPLE` se ignoran (`--include-examples` para probar). Puntuación = P × I; la del área = máximo de sus hallazgos (P19).

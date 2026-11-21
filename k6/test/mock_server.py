@@ -112,6 +112,8 @@ def dispatch(method, p):
             if "case_status" in p[1] and p[0] in BY_ID:
                 BY_ID[p[0]]["case_status"] = p[1]["case_status"]
         return {"id": p[0]}
+    if method in ("TestCase.add_tag", "TestCase.remove_tag"):
+        return None
     if method == "TestPlan.filter":
         return [{"id": PLAN_ID, "name": "Regressions"}] if f.get("name") == "Regressions" else []
     if method == "TestPlan.add_case":

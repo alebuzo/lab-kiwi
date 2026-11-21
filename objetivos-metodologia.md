@@ -53,7 +53,7 @@ Tabla 3. Descripción de operaciones de usuarios
 | U1 | Listado completo de casos (equivale a abrir "Search test cases") | ≈11,500 casos |
 | U2 | Búsqueda filtrada por producto, tipo funcional y un plan de pruebas | ≈1,500 casos |
 | U3 | Búsqueda por nombre de un caso | 1 caso |
-| U4 | Actualización de un campo del caso encontrado en U3 | 1 caso |
+| U4 | Modificación de un caso: alternar el tag `perf-u4` (agregar/quitar) en el caso encontrado en U3 | 1 caso |
 
 Tabla 4. Descripción de operaciones de automatizaciones
 

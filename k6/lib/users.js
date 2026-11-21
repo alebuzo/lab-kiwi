@@ -47,10 +47,9 @@ function runIteration(data, phase, userCount) {
   think();
 
   if (u3.ok) {
-    const prio = exec.scenario.iterationInTest % 2 === 0 ? data.priorityMedium : data.priorityHigh;
-    const id = u3.result[0].id;
-    rpc('TestCase.update', [id, { priority: prio }], Object.assign({ op: 'U4' }, base),
-      (v) => v !== null && typeof v === 'object');
+    // TestCase.update falla en Kiwi 13.5.5-sdk al serializar la respuesta (Platform); U4 alterna un tag
+    const method = exec.scenario.iterationInTest % 2 === 0 ? 'TestCase.add_tag' : 'TestCase.remove_tag';
+    rpc(method, [u3.result[0].id, 'perf-u4'], Object.assign({ op: 'U4' }, base), () => true);
   }
   think();
 }

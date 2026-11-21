@@ -203,7 +203,7 @@ def idle(rep, kind, pod):
 def pod_stats(rep, pod):
     cpu, mem = rep.series("cpu", pod), rep.series("memory", pod)
     thr = rep.series("throttling", pod)
-    eph = rep.eph_vals(pod, "rootfs_used_kb")
+    eph = rep.eph_vals(pod, "rootfs_du_kb")
     tmp = rep.eph_vals(pod, "tmp_kb")
     full = rep.series("restarts", pod, window=False)
     return dict(
@@ -532,7 +532,7 @@ def build_report(test, results, baseline_test, base_u3, make_figs=True):
     out = [f"## Prueba: {test} ({len(reps)} repetición(es))\n"]
     out.append(section("Tabla E5. Recursos por pod y repetición (réplica)", table_e5(test, reps, True),
                        "CPU en cores; memoria y almacenamiento en MiB. Reposo = promedio de los primeros 60 s de la serie; prom./máx. en la medición; "
-                       "Ef. storage = máx. de `rootfs_used_kb` de `ephemeral.csv` en toda la repetición (entre paréntesis, `/tmp`); "
+                       "Ef. storage = máx. de `rootfs_du_kb` (`du -sx /`, incluye las capas de la imagen) de `ephemeral.csv` en toda la repetición (entre paréntesis, `/tmp`); "
                        "tendencia = último vs primer cuarto de la medición (±10 %)."))
     prod = table_e5(test, reps, False)
     if len(prod):

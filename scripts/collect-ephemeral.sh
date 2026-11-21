@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Uso: collect-ephemeral.sh <test> <rep>   (INTERVAL=45; DRY_RUN=1 una sola iteración)
-# du -sk /tmp y df -k / de kiwi-perf-0 y kiwi-perf-mariadb-0 -> ephemeral.csv
+# du -sk /tmp y du -sxk / de kiwi-perf-0 y kiwi-perf-mariadb-0 -> ephemeral.csv
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
@@ -14,7 +14,7 @@ CSV="$DIR/ephemeral.csv"
 PODS=("$KIWI_POD" "$MARIADB_POD")
 require_running "${PODS[@]}"
 
-# Salida del pod: "<tmp_kb> <rootfs_used_kb> <método_tmp> <método_rootfs>"
+# Salida del pod: "<tmp_kb> <rootfs_du_kb> <método_tmp> <método_rootfs>"
 REMOTE='
 tmp=""; tm=du
 if command -v du >/dev/null 2>&1; then tmp=$(du -sk /tmp 2>/dev/null | cut -f1); fi
@@ -23,19 +23,16 @@ if [ -z "$tmp" ]; then
   tmp=$(find /tmp -type f -exec stat -c %s {} + 2>/dev/null | awk "{s+=\$1} END {printf \"%d\", s/1024}")
 fi
 [ -n "$tmp" ] || { tmp=NA; tm=none; }
-rt=""; rm=df
-if command -v df >/dev/null 2>&1; then rt=$(df -kP / 2>/dev/null | awk "NR==2{print \$3}"); fi
-if [ -z "$rt" ]; then
-  rm=stat-f
-  rt=$(stat -f -c "%S %b %f" / 2>/dev/null | awk "{printf \"%d\", (\$2-\$3)*\$1/1024}")
-fi
+rt=""; rm=du
+# du -x no cruza montajes (excluye volúmenes como /var/lib/mysql); df / mediría el disco compartido del nodo
+if command -v du >/dev/null 2>&1; then rt=$(du -sxk / 2>/dev/null | cut -f1); fi
 [ -n "$rt" ] || { rt=NA; rm=none; }
 echo "$tmp $rt $tm $rm"
 '
 
 stop=0
 trap 'stop=1; log "señal recibida, terminando..."' INT TERM
-[[ "$DRY_RUN" == 1 || -s "$CSV" ]] || echo "timestamp_utc,pod,tmp_kb,rootfs_used_kb" >"$CSV"
+[[ "$DRY_RUN" == 1 || -s "$CSV" ]] || echo "timestamp_utc,pod,tmp_kb,rootfs_du_kb" >"$CSV"
 
 declare -A seen_method
 ok=0; err=0
@@ -54,7 +51,7 @@ while (( ! stop )); do
       if [[ -z "${seen_method[$pod]:-}" ]]; then
         seen_method[$pod]=1
         log "$pod: método /tmp=$tm, rootfs=$rm_"
-        [[ "$tm" == du && "$rm_" == df ]] || warn "$pod: se usó método alterno (/tmp=$tm, rootfs=$rm_)"
+        [[ "$tm" == du && "$rm_" == du ]] || warn "$pod: se usó método alterno (/tmp=$tm, rootfs=$rm_)"
       fi
     else
       err=$((err + 1))
