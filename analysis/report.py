@@ -44,7 +44,7 @@ def to_utc_series(s):
 
 
 def label_value(text, key):
-    m = re.search(rf'"?{key}"?\s*[:=]\s*"([^"]+)"', str(text))
+    m = re.search(rf'(?<![\w]){key}"?\s*[:=]\s*"?([^";,\s}}]+)', str(text))
     return m.group(1) if m else None
 
 
@@ -63,14 +63,17 @@ def load_prom_file(path):
         for n in (name, *alt):
             if n in rest.columns.str.lower():
                 return rest[cols[n]].astype(str)
-        extracted = blob.map(lambda t: label_value(t, name))
-        return extracted if extracted.notna().any() else None
+        for n in (name, *alt):
+            extracted = blob.map(lambda t: label_value(t, n))
+            if extracted.notna().any():
+                return extracted
+        return None
 
     pod = label("pod")
     if pod is None:
         m = re.search(r"(kiwi[\w-]*-0)", path.stem)
         pod = pd.Series(m.group(1) if m else None, index=raw.index, dtype="object")
-    node = label("node", ("instance",))
+    node = label("node", ("nodename", "instance"))
     if node is None:
         m = re.search(r"(asic-x86-\d+)", path.stem)
         node = pd.Series(m.group(1) if m else None, index=raw.index, dtype="object")

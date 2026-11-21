@@ -344,8 +344,8 @@ El ensayo se hace fuera de la ventana de pruebas (idealmente en horario de bajo 
 ### Anexo A. Dimensionamiento de k6 y del CSV (medido en el smoke, 2026-11-20)
 
 - Smoke (1 VU, 107 requests): CSV de 271,710 B ≈ **2.5 KB por request** (≈12 líneas por request). Pico del pod `k6-runner-perf`: 0.058 cores y ≈205 MiB de memoria de trabajo.
-- Estimación para resistencia (6 VUs, 4 h): usuarios ≈0.44 req/s por VU (4 pausas de 1–3 s por iteración) más la sonda cada 10 s ≈ 40 mil requests; A1 cada 10 min ≈ 24 corridas × ≈1,500 llamadas ≈ 36 mil. Total ≈ 77 mil requests ≈ **190 MB de CSV**, unas 4 % de los 5Gi del PVC `k6-results-perf` (hoy usa 68 MB con los smokes). El tamaño de 5Gi alcanza.
-- CPU y memoria: con 18 VUs la carga de k6 sigue siendo muy inferior a los requests del pod (2 CPU / 4Gi; límites 8 CPU / 16Gi). Es una extrapolación; **se confirma en la primera corrida de 18 VUs**, para lo cual `collect-prometheus.sh` ahora también recolecta CPU y memoria del pod `k6-runner-perf` (`prom_cpu.csv`, `prom_mem_working_set.csv`). Si el pico de CPU de k6 se acerca a 2 cores, el generador podría limitar la carga y hay que subir los requests.
+- Medido en la carga rep 1 (60 min de medición, 6 VUs, 70 min en total): `k6.csv` de **115 MB** (≈46 mil requests de usuarios y sonda más ≈36.6 mil llamadas de A1; cada corrida de A1 hace ≈6,100 llamadas, no 1,500). Para resistencia (4 h, 24 corridas de A1) se estima ≈**460 MB**, menos del 10 % de los 5Gi del PVC `k6-results-perf`. El tamaño de 5Gi alcanza.
+- CPU y memoria: en la carga rep 1 (6 VUs) el pod `k6-runner-perf` tuvo un pico de 0.34 cores y 515 MiB (reposo 33 MiB; memoria subió durante la prueba), muy por debajo de los requests (2 CPU / 4Gi; límites 8 CPU / 16Gi). Con 18 VUs es una extrapolación; **se confirma en la primera corrida de 18 VUs**, para lo cual `collect-prometheus.sh` ahora también recolecta CPU y memoria del pod `k6-runner-perf` (`prom_cpu.csv`, `prom_mem_working_set.csv`). Si el pico de CPU de k6 se acerca a 2 cores, el generador podría limitar la carga y hay que subir los requests.
 
 ## 12. Estado de preparación
 

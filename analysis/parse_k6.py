@@ -53,6 +53,8 @@ def parse_times(path):
         return out
     for line in path.read_text().splitlines():
         low = line.lower()
+        if "_local" in low:
+            continue
         m = re.search(r"warm-?up|measure|medici[oó]n|cooldown|enfriamiento", low)
         if not m:
             continue
